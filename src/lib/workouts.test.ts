@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  activityEmoji,
+  currentStreak,
+  dailyMinutes,
+  goalPercent,
   shiftDate,
   todayIST,
+  topActivities,
   weeklyMinutesByUser,
   workoutInputSchema,
   type WorkoutRow,
@@ -61,5 +66,101 @@ describe("workoutInputSchema", () => {
 
   it("rejects a blank activity", () => {
     expect(workoutInputSchema.safeParse({ ...valid, activity: "   " }).success).toBe(false);
+  });
+});
+
+describe("dailyMinutes", () => {
+  const rows: WorkoutRow[] = [
+    { userId: "a", amount: 15, unit: "min", occurredOn: "2026-11-18" },
+    { userId: "b", amount: 5, unit: "min", occurredOn: "2026-11-18" },
+    { userId: "a", amount: 10, unit: "reps", occurredOn: "2026-11-17" },
+    { userId: "a", amount: 20, unit: "min", occurredOn: "2026-11-12" },
+    { userId: "a", amount: 99, unit: "min", occurredOn: "2026-11-11" },
+  ];
+
+  it("returns 7 days, oldest first, summing minutes only", () => {
+    const days = dailyMinutes(rows, "2026-11-18");
+    expect(days).toHaveLength(7);
+    expect(days[0]).toEqual({ date: "2026-11-12", minutes: 20 });
+    expect(days[5]).toEqual({ date: "2026-11-17", minutes: 0 });
+    expect(days[6]).toEqual({ date: "2026-11-18", minutes: 20 });
+  });
+
+  it("can be limited to one user", () => {
+    expect(dailyMinutes(rows, "2026-11-18", "b")[6]?.minutes).toBe(5);
+  });
+});
+
+describe("currentStreak", () => {
+  const log = (...dates: string[]): WorkoutRow[] =>
+    dates.map((occurredOn) => ({ userId: "a", amount: 5, unit: "min" as const, occurredOn }));
+
+  it("counts consecutive days ending today", () => {
+    expect(currentStreak(log("2026-11-18", "2026-11-17", "2026-11-16"), "2026-11-18", "a")).toBe(3);
+  });
+
+  it("keeps the streak alive if today is not logged yet", () => {
+    expect(currentStreak(log("2026-11-17", "2026-11-16"), "2026-11-18", "a")).toBe(2);
+  });
+
+  it("is zero after a missed day, and ignores other users", () => {
+    expect(currentStreak(log("2026-11-16"), "2026-11-18", "a")).toBe(0);
+    expect(currentStreak(log("2026-11-18"), "2026-11-18", "b")).toBe(0);
+  });
+});
+
+describe("activityEmoji", () => {
+  it("matches keywords and falls back", () => {
+    expect(activityEmoji("Walking")).toBe("🚶");
+    expect(activityEmoji("Resistance band (knee)")).toBe("🎗️");
+    expect(activityEmoji("Basketball")).toBe("💪");
+  });
+});
+
+describe("goalPercent", () => {
+  it("rounds and caps at 100", () => {
+    expect(goalPercent(75, 150)).toBe(50);
+    expect(goalPercent(200, 150)).toBe(100);
+    expect(goalPercent(0, 150)).toBe(0);
+    expect(goalPercent(10, 0)).toBe(0);
+  });
+});
+
+describe("topActivities", () => {
+  const rows = [
+    {
+      userId: "a",
+      activity: "Walking",
+      amount: 15,
+      unit: "min" as const,
+      occurredOn: "2026-11-18",
+    },
+    {
+      userId: "b",
+      activity: "walking",
+      amount: 20,
+      unit: "min" as const,
+      occurredOn: "2026-11-17",
+    },
+    { userId: "a", activity: "Squats", amount: 10, unit: "min" as const, occurredOn: "2026-11-18" },
+    {
+      userId: "a",
+      activity: "Knee band",
+      amount: 10,
+      unit: "reps" as const,
+      occurredOn: "2026-11-18",
+    },
+    { userId: "a", activity: "Old", amount: 50, unit: "min" as const, occurredOn: "2026-11-01" },
+  ];
+
+  it("groups case-insensitively, ignores old entries and sums minutes only", () => {
+    const top = topActivities(rows, "2026-11-18");
+    expect(top[0]).toEqual({ activity: "Walking", minutes: 35, count: 2 });
+    expect(top.map((t) => t.activity)).not.toContain("Old");
+    expect(top.find((t) => t.activity === "Knee band")?.minutes).toBe(0);
+  });
+
+  it("respects the limit", () => {
+    expect(topActivities(rows, "2026-11-18", 2)).toHaveLength(2);
   });
 });
