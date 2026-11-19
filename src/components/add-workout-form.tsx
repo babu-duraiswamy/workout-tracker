@@ -2,9 +2,17 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { addWorkout, type AddState } from "@/app/actions";
-import { activityEmoji, QUICK_PICKS } from "@/lib/workouts";
+import { activityEmoji, formatUK, QUICK_PICKS, shiftDate } from "@/lib/workouts";
 
 const initial: AddState = {};
+
+/** Typing "18112026" becomes "18/11/2026". Typed separators are kept out of the way. */
+function autoSlash(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
 
 const CHIP_COLORS = [
   "bg-emerald-100 text-emerald-900 hover:bg-emerald-200 dark:bg-emerald-950 dark:text-emerald-200 dark:hover:bg-emerald-900",
@@ -32,6 +40,11 @@ export function AddWorkoutForm({ today }: { today: string }) {
     if (!input) return;
     const next = Math.min(999, Math.max(1, (Number(input.value) || 0) + delta));
     input.value = String(next);
+  }
+
+  function setDate(iso: string) {
+    const input = formRef.current?.elements.namedItem("occurredOn") as HTMLInputElement | null;
+    if (input) input.value = formatUK(iso);
   }
 
   function pick(activity: string, amount: number, unit: string) {
@@ -117,7 +130,33 @@ export function AddWorkoutForm({ today }: { today: string }) {
 
         <label className="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-300">
           Date
-          <input name="occurredOn" type="date" defaultValue={today} required className={FIELD} />
+          <input
+            name="occurredOn"
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={10}
+            defaultValue={formatUK(today)}
+            required
+            placeholder="DD/MM/YYYY"
+            onChange={(e) => (e.target.value = autoSlash(e.target.value))}
+            className={FIELD}
+          />
+          <div className="flex gap-1.5" role="group" aria-label="Set date">
+            {[
+              { label: "Today", days: 0 },
+              { label: "Yesterday", days: -1 },
+            ].map((d) => (
+              <button
+                key={d.label}
+                type="button"
+                onClick={() => setDate(shiftDate(today, d.days))}
+                className="flex-1 rounded-lg bg-slate-100 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-200 active:scale-95 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
         </label>
       </div>
 

@@ -2,26 +2,40 @@ import { desc, eq, gte } from "drizzle-orm";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
+import { ActivityDonut } from "@/components/activity-donut";
 import { AddWorkoutForm } from "@/components/add-workout-form";
 import { Avatar, TONES, type Tone } from "@/components/avatar";
 import { DeleteButton } from "@/components/delete-button";
 import { GoalRing } from "@/components/goal-ring";
+import { Heatmap } from "@/components/heatmap";
+import { KpiTiles } from "@/components/kpi-tiles";
+import { TrendChart } from "@/components/trend-chart";
 import { db, schema } from "@/db";
 import {
+  activityBreakdown,
   activityEmoji,
   currentStreak,
-  dailyMinutes,
+  formatUK,
+  heatmapWeeks,
+  minutesByUser,
+  parseRange,
+  RANGES,
+  rangeDays,
+  series,
   shiftDate,
+  summarize,
   todayIST,
   topActivities,
   WEEKLY_GOAL_MIN,
-  weeklyMinutesByUser,
+  windowStart,
+  type RangeKey,
 } from "@/lib/workouts";
 
 export const dynamic = "force-dynamic";
 
-const LOG_DAYS = 60;
-const LOG_LIMIT = 500;
+// Two years of history, so the "Year" view can compare with the year before.
+const HISTORY_DAYS = 730;
+const ROW_LIMIT = 5000;
 
 const CARD =
   "rounded-3xl border border-white/60 bg-white/70 p-4 shadow-lg shadow-emerald-900/5 backdrop-blur dark:border-white/10 dark:bg-slate-900/60";
@@ -37,13 +51,29 @@ function displayName(name: string | null, email: string): string {
   return name?.trim() || email.split("@")[0] || "Someone";
 }
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ who?: string }> }) {
+/** Link that keeps the other query parameter, leaving defaults out of the URL. */
+function href(range: RangeKey, who: Filter): string {
+  const q = new URLSearchParams();
+  if (range !== "week") q.set("range", range);
+  if (who !== "all") q.set("who", who);
+  const s = q.toString();
+  return s ? `/?${s}` : "/";
+}
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ who?: string; range?: string }>;
+}) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   const viewerId = session.user.id;
 
-  const { who } = await searchParams;
-  const filter: Filter = who === "me" || who === "them" ? who : "all";
+  const params = await searchParams;
+  const filter: Filter = params.who === "me" || params.who === "them" ? params.who : "all";
+  const range = parseRange(params.range);
+  const days = rangeDays(range);
+  const rangeLabel = RANGES.find((r) => r.key === range)?.label ?? "Week";
 
   const today = todayIST();
   const rows = await db
@@ -59,9 +89,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
     })
     .from(schema.workouts)
     .innerJoin(schema.users, eq(schema.users.id, schema.workouts.userId))
-    .where(gte(schema.workouts.occurredOn, shiftDate(today, -(LOG_DAYS - 1))))
+    .where(gte(schema.workouts.occurredOn, shiftDate(today, -(HISTORY_DAYS - 1))))
     .orderBy(desc(schema.workouts.occurredOn), desc(schema.workouts.createdAt))
-    .limit(LOG_LIMIT);
+    .limit(ROW_LIMIT);
 
   const names = new Map<string, string>();
   for (const r of rows) names.set(r.userId, displayName(r.userName, r.userEmail));
@@ -70,16 +100,24 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
   const nameOf = (id: string) => (id === viewerId ? "You" : (names.get(id) ?? "Someone"));
   const toneOf = (id: string): Tone => (id === viewerId ? "you" : "other");
 
-  const weekly = weeklyMinutesByUser(rows, today);
+  // Always-on numbers: weekly goal, streak, and the header pills.
+  const weekly = minutesByUser(rows, today, 7);
+  const weekTotal = [...weekly.values()].reduce((a, b) => a + b, 0);
   const streak = currentStreak(rows, today, viewerId);
-  const allDays = dailyMinutes(rows, today);
-  const myDays = dailyMinutes(rows, today, viewerId);
-  const chartMax = Math.max(1, ...allDays.map((d) => d.minutes));
-  const weekTotal = allDays.reduce((sum, d) => sum + d.minutes, 0);
-  const top = topActivities(rows, today);
-
-  // Goal cards: you first, then anyone else who has logged.
   const people = [viewerId, ...[...names.keys()].filter((id) => id !== viewerId)];
+
+  // Numbers for the selected range.
+  const summary = summarize(rows, today, days);
+  const trend = series(rows, today, days, viewerId);
+  const slices = activityBreakdown(rows, today, days);
+  const rangeByUser = minutesByUser(rows, today, days);
+  const top = topActivities(rows, today);
+  const weeks = heatmapWeeks(rows, today, 12);
+  const myRange = rangeByUser.get(viewerId) ?? 0;
+  const theirRange = [...rangeByUser.entries()]
+    .filter(([id]) => id !== viewerId)
+    .reduce((s, [, m]) => s + m, 0);
+  const rangeTotal = myRange + theirRange;
 
   // What the other person did today, for the nudge banner.
   const theirToday = rows.filter((r) => r.occurredOn === today && r.userId !== viewerId);
@@ -87,16 +125,26 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
   const theirName = theirToday[0] ? nameOf(theirToday[0].userId) : null;
   const theirMinutes = theirToday.reduce((s, r) => s + (r.unit === "min" ? r.amount : 0), 0);
 
-  // Group the (filtered) log by day, newest first.
-  const shown = rows.filter((r) =>
-    filter === "me" ? r.userId === viewerId : filter === "them" ? r.userId !== viewerId : true,
+  // The log: only the chosen range and person, grouped by month (for long ranges) then day.
+  const from = windowStart(today, days);
+  const shown = rows.filter(
+    (r) =>
+      r.occurredOn >= from &&
+      (filter === "me" ? r.userId === viewerId : filter === "them" ? r.userId !== viewerId : true),
   );
-  const days = new Map<string, typeof rows>();
+  type Row = (typeof rows)[number];
+  const months = new Map<string, { days: Map<string, Row[]>; minutes: number; sessions: number }>();
   for (const r of shown) {
-    const list = days.get(r.occurredOn) ?? [];
+    const key = r.occurredOn.slice(0, 7);
+    const month = months.get(key) ?? { days: new Map(), minutes: 0, sessions: 0 };
+    const list = month.days.get(r.occurredOn) ?? [];
     list.push(r);
-    days.set(r.occurredOn, list);
+    month.days.set(r.occurredOn, list);
+    month.sessions += 1;
+    if (r.unit === "min") month.minutes += r.amount;
+    months.set(key, month);
   }
+  const showMonths = days > 7;
 
   return (
     <main className="mx-auto grid max-w-xl gap-6 px-4 pt-4 pb-12">
@@ -115,6 +163,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
             <h1 className="truncate text-3xl font-extrabold tracking-tight">
               {myName.split(" ")[0]}
             </h1>
+            <p className="mt-0.5 text-xs text-white/80">{formatUK(today)}</p>
           </div>
           <form
             action={async () => {
@@ -164,8 +213,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
         <AddWorkoutForm today={today} />
       </div>
 
-      <section aria-labelledby="week-h" className="grid gap-3">
-        <h2 id="week-h" className="text-sm font-bold tracking-wide text-slate-500 uppercase">
+      <section aria-labelledby="goal-h" className="grid gap-3">
+        <h2 id="goal-h" className="text-sm font-bold tracking-wide text-slate-500 uppercase">
           Weekly goal · {WEEKLY_GOAL_MIN} min each
         </h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -195,65 +244,105 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
             );
           })}
         </div>
+      </section>
 
-        {weekTotal > 0 && (
+      <section aria-labelledby="insights-h" className="grid gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 id="insights-h" className="text-sm font-bold tracking-wide text-slate-500 uppercase">
+            Insights
+          </h2>
+          <nav
+            aria-label="Time range"
+            className="flex rounded-full bg-white/70 p-1 text-sm shadow-sm dark:bg-slate-900/70"
+          >
+            {RANGES.map((r) => (
+              <Link
+                key={r.key}
+                href={href(r.key, filter)}
+                aria-current={range === r.key ? "page" : undefined}
+                className={`rounded-full px-2.5 py-1 font-medium whitespace-nowrap transition sm:px-3 ${
+                  range === r.key
+                    ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow"
+                    : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                }`}
+              >
+                {r.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+
+        <p className="px-1 text-xs text-slate-500">
+          {formatUK(from)} – {formatUK(today)}
+        </p>
+
+        <KpiTiles summary={summary} days={days} />
+
+        <div className={CARD}>
+          {summary.minutes === 0 ? (
+            <p className="py-6 text-center text-sm text-slate-600 dark:text-slate-400">
+              <span className="mb-2 block text-3xl">🌱</span>
+              No minutes logged in this period yet.
+            </p>
+          ) : (
+            <TrendChart data={trend} />
+          )}
+        </div>
+
+        {rangeTotal > 0 && (
           <div className={CARD}>
             <div className="flex items-baseline justify-between">
-              <span className="text-sm font-semibold">Last 7 days</span>
-              <span className="text-sm text-slate-600 tabular-nums dark:text-slate-400">
-                {weekTotal} min together
-              </span>
+              <span className="text-sm font-semibold">Head to head</span>
+              <span className="text-xs text-slate-500">{rangeTotal} min together</span>
             </div>
             <div
-              className="mt-4 flex h-28 items-end gap-2"
+              className="mt-3 flex h-7 overflow-hidden rounded-full bg-slate-200/70 text-xs font-bold text-white dark:bg-slate-800"
               role="img"
-              aria-label={chartLabel(allDays)}
+              aria-label={`You ${myRange} minutes, them ${theirRange} minutes`}
             >
-              {allDays.map((d, i) => {
-                const mine = myDays[i]?.minutes ?? 0;
-                const theirs = d.minutes - mine;
-                const isToday = d.date === today;
-                return (
-                  <div
-                    key={d.date}
-                    className="flex h-full min-w-0 flex-1 flex-col items-center gap-1"
-                  >
-                    <div className="flex w-full flex-1 flex-col justify-end">
-                      <div
-                        className="animate-grow-up flex w-full flex-col justify-end overflow-hidden rounded-md bg-slate-200/60 dark:bg-slate-800/60"
-                        style={{
-                          height: `${Math.max(6, (d.minutes / chartMax) * 100)}%`,
-                          animationDelay: `${i * 70}ms`,
-                        }}
-                      >
-                        <div className={TONES.other.bar} style={{ flexGrow: theirs }} />
-                        <div className={TONES.you.bar} style={{ flexGrow: mine }} />
-                      </div>
-                    </div>
-                    <span
-                      className={`text-xs ${isToday ? "font-bold text-slate-900 dark:text-slate-100" : "text-slate-500"}`}
-                    >
-                      {weekdayLetter(d.date)}
-                    </span>
-                  </div>
-                );
-              })}
+              {myRange > 0 && (
+                <div
+                  className={`grid place-items-center ${TONES.you.bar}`}
+                  style={{ width: `${(myRange / rangeTotal) * 100}%` }}
+                >
+                  {myRange}
+                </div>
+              )}
+              {theirRange > 0 && (
+                <div
+                  className={`grid place-items-center ${TONES.other.bar}`}
+                  style={{ width: `${(theirRange / rangeTotal) * 100}%` }}
+                >
+                  {theirRange}
+                </div>
+              )}
             </div>
-            <div className="mt-3 flex gap-4 text-xs text-slate-600 dark:text-slate-400">
-              <span className="flex items-center gap-1.5">
-                <i className={`size-2.5 rounded-full ${TONES.you.bar}`} /> You
+            <div className="mt-2 flex justify-between text-xs text-slate-600 dark:text-slate-400">
+              <span className={TONES.you.text}>
+                You · {Math.round((myRange / rangeTotal) * 100)}%
               </span>
-              <span className="flex items-center gap-1.5">
-                <i className={`size-2.5 rounded-full ${TONES.other.bar}`} /> Them
+              <span className={TONES.other.text}>
+                Them · {Math.round((theirRange / rangeTotal) * 100)}%
               </span>
             </div>
           </div>
         )}
 
+        {slices.length > 0 && (
+          <div className={CARD}>
+            <div className="mb-3 text-sm font-semibold">Where the minutes went</div>
+            <ActivityDonut slices={slices} />
+          </div>
+        )}
+
+        <div className={CARD}>
+          <Heatmap weeks={weeks} today={today} />
+        </div>
+
         {top.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">
-              Most done:
+              Most done this week:
             </span>
             {top.map((t) => (
               <span
@@ -271,7 +360,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
       <section aria-labelledby="log-h" className="grid gap-4">
         <div className="flex items-center justify-between gap-3">
           <h2 id="log-h" className="text-sm font-bold tracking-wide text-slate-500 uppercase">
-            Log
+            Log · {rangeLabel}
           </h2>
           <nav
             aria-label="Filter log"
@@ -280,7 +369,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
             {FILTERS.map((f) => (
               <Link
                 key={f.key}
-                href={f.key === "all" ? "/" : `/?who=${f.key}`}
+                href={href(range, f.key)}
                 aria-current={filter === f.key ? "page" : undefined}
                 className={`rounded-full px-3 py-1 font-medium transition ${
                   filter === f.key
@@ -301,57 +390,75 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
             <span className="mb-2 block text-3xl">🏁</span>
             {rows.length === 0
               ? "No workouts logged yet. Pick a quick option above, then tap Log it."
-              : "Nothing here for this filter."}
+              : "Nothing here for this period and filter."}
           </p>
         ) : (
-          [...days.entries()].map(([date, items]) => {
-            const dayMins = items.reduce((sum, r) => sum + (r.unit === "min" ? r.amount : 0), 0);
-            return (
-              <div key={date} className="grid gap-2">
-                <h3 className="flex items-baseline justify-between px-1 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                  {dayLabel(date, today)}
-                  {dayMins > 0 && (
-                    <span className="text-xs font-normal text-slate-500 tabular-nums">
-                      {dayMins} min
-                    </span>
-                  )}
-                </h3>
-                <ul className="grid gap-2">
-                  {items.map((r) => {
-                    const tone = toneOf(r.userId);
-                    return (
-                      <li
-                        key={r.id}
-                        className={`animate-rise flex items-center gap-3 rounded-2xl border border-l-4 border-white/60 bg-white/80 px-3 py-3 shadow-sm dark:border-white/10 dark:bg-slate-900/70 ${tone === "you" ? "border-l-emerald-500" : "border-l-violet-500"}`}
-                      >
-                        <span
-                          aria-hidden="true"
-                          className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-amber-100 to-rose-100 text-2xl dark:from-slate-800 dark:to-slate-700"
-                        >
-                          {activityEmoji(r.activity)}
+          [...months.entries()].map(([monthKey, month]) => (
+            <div key={monthKey} className="grid gap-4">
+              {showMonths && (
+                <div className="flex items-baseline justify-between rounded-2xl bg-gradient-to-r from-slate-900 to-slate-700 px-4 py-2.5 text-white dark:from-slate-800 dark:to-slate-700">
+                  <span className="font-bold">{monthLabel(monthKey)}</span>
+                  <span className="text-xs text-white/80 tabular-nums">
+                    {month.minutes} min · {month.sessions}{" "}
+                    {month.sessions === 1 ? "session" : "sessions"}
+                  </span>
+                </div>
+              )}
+              {[...month.days.entries()].map(([date, items]) => {
+                const dayMins = items.reduce(
+                  (sum, r) => sum + (r.unit === "min" ? r.amount : 0),
+                  0,
+                );
+                return (
+                  <div key={date} className="grid gap-2">
+                    <h3 className="flex items-baseline justify-between px-1 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      {dayLabel(date, today)}
+                      {dayMins > 0 && (
+                        <span className="text-xs font-normal text-slate-500 tabular-nums">
+                          {dayMins} min
                         </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate font-semibold">{r.activity}</div>
-                          <div className="mt-0.5 flex items-center gap-1.5 text-sm">
-                            <Avatar name={nameOf(r.userId)} tone={tone} size="sm" />
-                            <span className={`font-medium ${TONES[tone].text}`}>
-                              {nameOf(r.userId)}
+                      )}
+                    </h3>
+                    <ul className="grid gap-2">
+                      {items.map((r) => {
+                        const tone = toneOf(r.userId);
+                        return (
+                          <li
+                            key={r.id}
+                            className={`animate-rise flex items-center gap-3 rounded-2xl border border-l-4 border-white/60 bg-white/80 px-3 py-3 shadow-sm dark:border-white/10 dark:bg-slate-900/70 ${tone === "you" ? "border-l-emerald-500" : "border-l-violet-500"}`}
+                          >
+                            <span
+                              aria-hidden="true"
+                              className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-amber-100 to-rose-100 text-2xl dark:from-slate-800 dark:to-slate-700"
+                            >
+                              {activityEmoji(r.activity)}
                             </span>
-                          </div>
-                        </div>
-                        <span
-                          className={`rounded-full px-3 py-1 text-sm font-bold whitespace-nowrap tabular-nums ${TONES[tone].chip}`}
-                        >
-                          {r.amount} {r.unit === "reps" ? "reps" : "min"}
-                        </span>
-                        {r.userId === viewerId && <DeleteButton id={r.id} activity={r.activity} />}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            );
-          })
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate font-semibold">{r.activity}</div>
+                              <div className="mt-0.5 flex items-center gap-1.5 text-sm">
+                                <Avatar name={nameOf(r.userId)} tone={tone} size="sm" />
+                                <span className={`font-medium ${TONES[tone].text}`}>
+                                  {nameOf(r.userId)}
+                                </span>
+                              </div>
+                            </div>
+                            <span
+                              className={`rounded-full px-3 py-1 text-sm font-bold whitespace-nowrap tabular-nums ${TONES[tone].chip}`}
+                            >
+                              {r.amount} {r.unit === "reps" ? "reps" : "min"}
+                            </span>
+                            {r.userId === viewerId && (
+                              <DeleteButton id={r.id} activity={r.activity} />
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                );
+              })}
+            </div>
+          ))
         )}
       </section>
     </main>
@@ -372,26 +479,23 @@ function greeting(now: Date = new Date()): string {
   return "Good evening 🌙";
 }
 
-function weekdayLetter(date: string): string {
-  const [y, m, d] = date.split("-").map(Number) as [number, number, number];
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-IN", {
-    weekday: "narrow",
+function monthLabel(key: string): string {
+  const [y, m] = key.split("-").map(Number) as [number, number];
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-GB", {
+    month: "long",
+    year: "numeric",
     timeZone: "UTC",
   });
 }
 
-function chartLabel(days: { date: string; minutes: number }[]): string {
-  return `Minutes per day: ${days.map((d) => `${d.date} ${d.minutes}`).join(", ")}`;
-}
-
+/** "Today", "Yesterday", otherwise "Mon 17/11/2026". */
 function dayLabel(date: string, today: string): string {
   if (date === today) return "Today";
   if (date === shiftDate(today, -1)) return "Yesterday";
   const [y, m, d] = date.split("-").map(Number) as [number, number, number];
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-IN", {
-    weekday: "long",
-    day: "numeric",
-    month: "short",
+  const weekday = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-GB", {
+    weekday: "short",
     timeZone: "UTC",
   });
+  return `${weekday} ${formatUK(date)}`;
 }

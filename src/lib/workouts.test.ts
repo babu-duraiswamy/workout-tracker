@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   activityEmoji,
+  activityBreakdown,
   currentStreak,
+  formatUK,
+  heatmapWeeks,
+  parseRange,
+  parseUKDate,
+  series,
+  summarize,
   dailyMinutes,
   goalPercent,
   shiftDate,
@@ -162,5 +169,113 @@ describe("topActivities", () => {
 
   it("respects the limit", () => {
     expect(topActivities(rows, "2026-11-18", 2)).toHaveLength(2);
+  });
+});
+
+describe("UK dates", () => {
+  it("formats ISO as DD/MM/YYYY", () => {
+    expect(formatUK("2026-11-18")).toBe("18/11/2026");
+  });
+
+  it("parses the common UK spellings and ISO", () => {
+    for (const input of ["18/11/2026", "18-11-2026", "18.11.2026", "18112026", "2026-11-18"]) {
+      expect(parseUKDate(input)).toBe("2026-11-18");
+    }
+    expect(parseUKDate("8/1/2026")).toBe("2026-01-08");
+  });
+
+  it("rejects impossible or malformed dates", () => {
+    for (const input of ["31/02/2026", "13/13/2026", "2026/11/18", "hello", ""]) {
+      expect(parseUKDate(input)).toBeNull();
+    }
+  });
+
+  it("is accepted by the workout schema and normalised to ISO", () => {
+    const base = { activity: "Walk", amount: 5, unit: "min" };
+    const ok = workoutInputSchema.safeParse({ ...base, occurredOn: "18/11/2026" });
+    expect(ok.success && ok.data.occurredOn).toBe("2026-11-18");
+    expect(workoutInputSchema.safeParse({ ...base, occurredOn: "32/11/2026" }).success).toBe(false);
+  });
+});
+
+describe("analytics", () => {
+  const today = "2026-11-18"; // a Wednesday
+  const mk = (
+    userId: string,
+    occurredOn: string,
+    amount: number,
+    unit: "min" | "reps" = "min",
+    activity = "Walking",
+  ) => ({ userId, occurredOn, amount, unit, activity });
+  const rows = [
+    mk("a", "2026-11-18", 30),
+    mk("a", "2026-11-17", 15, "min", "Squats"),
+    mk("b", "2026-11-17", 10),
+    mk("a", "2026-11-16", 10, "reps", "Knee band"),
+    mk("a", "2026-11-09", 60), // previous 7-day window (11-05 to 11-11)
+    mk("a", "2026-11-05", 40), // previous window too
+  ];
+
+  it("summarises a window and compares with the previous one", () => {
+    const s = summarize(rows, today, 7);
+    expect(s.minutes).toBe(55);
+    expect(s.sessions).toBe(4);
+    expect(s.activeDays).toBe(3);
+    expect(s.avgPerActiveDay).toBe(18);
+    expect(s.best).toEqual({ date: "2026-11-18", minutes: 30 });
+    expect(s.busiestWeekday).toBe(3);
+    expect(s.previousMinutes).toBe(100);
+    expect(s.deltaPct).toBe(-45);
+  });
+
+  it("returns an empty summary for an empty window", () => {
+    expect(summarize([], today, 7)).toMatchObject({
+      minutes: 0,
+      best: null,
+      busiestWeekday: null,
+      deltaPct: null,
+    });
+  });
+
+  it("breaks minutes down by activity and merges the tail into Other", () => {
+    const slices = activityBreakdown(rows, today, 7, 1);
+    expect(slices.map((x) => x.activity)).toEqual(["Walking", "Other"]);
+    expect(slices[0]).toMatchObject({ minutes: 40, pct: 73 });
+    expect(slices[1]?.minutes).toBe(15);
+  });
+
+  it("buckets a series by day, week or month and splits mine/theirs", () => {
+    const week = series(rows, today, 7, "a");
+    expect(week.kind).toBe("day");
+    expect(week.buckets).toHaveLength(7);
+    expect(week.buckets[5]).toMatchObject({ mine: 15, theirs: 10 });
+    const quarter = series(rows, today, 90, "a");
+    expect(quarter.kind).toBe("week");
+    expect(quarter.buckets).toHaveLength(13);
+    const year = series(rows, today, 365, "a");
+    expect(year.kind).toBe("month");
+    expect(year.buckets).toHaveLength(12);
+    expect(year.buckets[11]).toMatchObject({
+      start: "2026-11-01",
+      end: today,
+      mine: 145,
+      theirs: 10,
+    });
+  });
+
+  it("builds a Monday-first heatmap ending with this week", () => {
+    const grid = heatmapWeeks(rows, today, 12);
+    expect(grid).toHaveLength(12);
+    expect(grid.every((w) => w.length === 7)).toBe(true);
+    expect(grid[11]?.[0]?.date).toBe("2026-11-16");
+    expect(grid[11]?.[2]).toMatchObject({ date: "2026-11-18", minutes: 30, future: false });
+    expect(grid[11]?.[3]?.future).toBe(true);
+    expect(grid[11]?.[2]?.level).toBe(2);
+  });
+
+  it("falls back to week for unknown ranges", () => {
+    expect(parseRange("month")).toBe("month");
+    expect(parseRange("nonsense")).toBe("week");
+    expect(parseRange(undefined)).toBe("week");
   });
 });
