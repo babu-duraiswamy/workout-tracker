@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+/* Tailwind v4 resets buttons to the default arrow. Anything clickable should show the hand. */
+@layer base {
+  button:not(:disabled),
+  [role="button"],
+  select,
+  summary,
+  label[for],
+  a[href] {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
 @keyframes rise {
   from {
     opacity: 0;

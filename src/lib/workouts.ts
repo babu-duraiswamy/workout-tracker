@@ -6,21 +6,42 @@ import { z } from "zod";
 export const UNITS = ["min", "reps"] as const;
 export type Unit = (typeof UNITS)[number];
 
-export type QuickPick = {
+export type ActivityOption = {
+  /** Shown on the tile. */
   label: string;
+  /** Saved with the entry. Kept stable so older entries group with new ones. */
   activity: string;
-  amount: number;
+  /** Unit pre-selected when the tile is tapped. The person can still change it. */
   unit: Unit;
 };
 
-export const QUICK_PICKS: QuickPick[] = [
-  { label: "Walking 15 min", activity: "Walking", amount: 15, unit: "min" },
-  { label: "Squats 10 min", activity: "Squats", amount: 10, unit: "min" },
-  { label: "Knee band 10 reps", activity: "Resistance band (knee)", amount: 10, unit: "reps" },
-  { label: "Breathing 5 min", activity: "Breathing exercises", amount: 5, unit: "min" },
-  { label: "Workout 5 min", activity: "Workout", amount: 5, unit: "min" },
-  { label: "Stretching 10 min", activity: "Stretching", amount: 10, unit: "min" },
+/** Activities offered as tiles. The person picks one, then picks how much, separately. */
+export const ACTIVITIES: ActivityOption[] = [
+  { label: "Walking", activity: "Walking", unit: "min" },
+  { label: "Running", activity: "Running", unit: "min" },
+  { label: "Cycling", activity: "Cycling", unit: "min" },
+  { label: "Swimming", activity: "Swimming", unit: "min" },
+  { label: "Squats", activity: "Squats", unit: "min" },
+  { label: "Lunges", activity: "Lunges", unit: "reps" },
+  { label: "Push-ups", activity: "Push-ups", unit: "reps" },
+  { label: "Pull-ups", activity: "Pull-ups", unit: "reps" },
+  { label: "Sit-ups", activity: "Sit-ups", unit: "reps" },
+  { label: "Plank", activity: "Plank", unit: "min" },
+  { label: "Knee band", activity: "Resistance band (knee)", unit: "reps" },
+  { label: "Strength", activity: "Strength training", unit: "min" },
+  { label: "Workout", activity: "Workout", unit: "min" },
+  { label: "Yoga", activity: "Yoga", unit: "min" },
+  { label: "Stretching", activity: "Stretching", unit: "min" },
+  { label: "Breathing", activity: "Breathing exercises", unit: "min" },
+  { label: "Dance", activity: "Dance", unit: "min" },
+  { label: "Stairs", activity: "Stairs", unit: "min" },
 ];
+
+/** One-tap amounts shown for each unit. Any other number can be typed. */
+export const AMOUNT_PRESETS: Record<Unit, number[]> = {
+  min: [5, 10, 15, 20, 30, 45, 60],
+  reps: [5, 10, 15, 20, 25, 30, 50],
+};
 
 export const workoutInputSchema = z.object({
   activity: z
@@ -89,7 +110,10 @@ export function activityEmoji(activity: string): string {
   if (/stretch/.test(a)) return "🤸";
   if (/cycl|bike/.test(a)) return "🚴";
   if (/swim/.test(a)) return "🏊";
-  if (/weight|lift|gym|push|pull/.test(a)) return "🏋️";
+  if (/weight|lift|gym|push|pull|strength/.test(a)) return "🏋️";
+  if (/dance|zumba/.test(a)) return "💃";
+  if (/plank|core|abs|sit-?up/.test(a)) return "🎯";
+  if (/stair|climb/.test(a)) return "🧗";
   return "💪";
 }
 

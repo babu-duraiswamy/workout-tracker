@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { auth } from "@/auth";
@@ -42,5 +42,29 @@ export async function deleteWorkout(id: string): Promise<void> {
   await db
     .delete(schema.workouts)
     .where(and(eq(schema.workouts.id, id), eq(schema.workouts.userId, userId)));
+  revalidatePath("/");
+}
+
+const idsSchema = z.array(z.uuid()).min(1).max(500);
+
+/** Remove several of your own entries at once. Anything not yours is ignored by the query. */
+export async function deleteSelected(formData: FormData): Promise<void> {
+  const userId = await currentUserId();
+  if (!userId) return;
+  const ids = idsSchema.safeParse(formData.getAll("ids"));
+  if (!ids.success) return;
+
+  await db
+    .delete(schema.workouts)
+    .where(and(inArray(schema.workouts.id, ids.data), eq(schema.workouts.userId, userId)));
+  revalidatePath("/");
+}
+
+/** Remove every entry you have logged. The other person's entries are never touched. */
+export async function clearMyWorkouts(): Promise<void> {
+  const userId = await currentUserId();
+  if (!userId) return;
+
+  await db.delete(schema.workouts).where(eq(schema.workouts.userId, userId));
   revalidatePath("/");
 }

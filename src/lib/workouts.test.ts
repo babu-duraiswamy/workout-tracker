@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  ACTIVITIES,
+  AMOUNT_PRESETS,
   activityEmoji,
   activityBreakdown,
   currentStreak,
@@ -277,5 +279,30 @@ describe("analytics", () => {
     expect(parseRange("month")).toBe("month");
     expect(parseRange("nonsense")).toBe("week");
     expect(parseRange(undefined)).toBe("week");
+  });
+});
+
+describe("activity options", () => {
+  it("has unique names that the schema accepts", () => {
+    const names = ACTIVITIES.map((a) => a.activity);
+    expect(new Set(names).size).toBe(names.length);
+    for (const a of ACTIVITIES) {
+      const parsed = workoutInputSchema.safeParse({
+        activity: a.activity,
+        amount: 10,
+        unit: a.unit,
+        occurredOn: "18/11/2026",
+      });
+      expect(parsed.success, a.activity).toBe(true);
+    }
+  });
+
+  it("offers valid amount presets for both units", () => {
+    for (const unit of ["min", "reps"] as const) {
+      expect(AMOUNT_PRESETS[unit].length).toBeGreaterThan(3);
+      expect(AMOUNT_PRESETS[unit].every((n) => Number.isInteger(n) && n >= 1 && n <= 999)).toBe(
+        true,
+      );
+    }
   });
 });
