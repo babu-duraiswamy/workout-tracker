@@ -1,11 +1,12 @@
 "use client";
 
+import { Minus, PartyPopper, Plus, Repeat, Timer } from "lucide-react";
 import { useActionState, useState } from "react";
+import { ActivityIcon } from "@/components/activity-icon";
 import { addWorkout, type AddState } from "@/app/actions";
 import {
   ACTIVITIES,
   AMOUNT_PRESETS,
-  activityEmoji,
   formatUK,
   parseUKDate,
   shiftDate,
@@ -23,20 +24,20 @@ function autoSlash(value: string): string {
 }
 
 const FIELD =
-  "min-w-0 rounded-xl border border-slate-200 bg-white/80 px-3 py-2.5 text-base text-slate-900 transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 focus:outline-none dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-100";
+  "min-w-0 rounded-xl border border-slate-200 bg-white/80 px-3 py-2.5 text-base text-slate-900 transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30 focus:outline-none dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-100";
 
 const CHIP =
-  "rounded-full px-3.5 py-1.5 text-sm font-semibold transition active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600";
+  "rounded-full px-3.5 py-1.5 text-sm font-semibold transition active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600";
 const CHIP_OFF =
   "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700";
 const CHIP_ON =
-  "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-600/25";
+  "bg-gradient-to-r from-orange-500 to-rose-500 text-white shadow-md shadow-orange-600/25";
 
 function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
     <fieldset className="grid gap-2.5">
       <legend className="mb-2.5 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
-        <span className="grid size-6 place-items-center rounded-full bg-gradient-to-br from-emerald-500 to-sky-500 text-xs text-white">
+        <span className="grid size-6 place-items-center rounded-full bg-gradient-to-br from-orange-500 to-rose-500 text-xs text-white">
           {n}
         </span>
         {title}
@@ -91,10 +92,10 @@ export function AddWorkoutForm({ today }: { today: string }) {
   return (
     <form
       action={formAction}
-      className="grid gap-6 rounded-3xl border border-white/60 bg-white/70 p-5 shadow-lg shadow-emerald-900/5 backdrop-blur dark:border-white/10 dark:bg-slate-900/60"
+      className="grid gap-6 rounded-3xl border border-white/60 bg-white/70 p-5 shadow-lg shadow-orange-900/5 backdrop-blur dark:border-white/10 dark:bg-slate-900/60"
     >
       <div>
-        <h2 className="text-xl font-extrabold tracking-tight">Log a workout</h2>
+        <h2 className="text-xl font-bold tracking-tight">Log a workout</h2>
         <p className="text-sm text-slate-600 dark:text-slate-400">
           Pick what you did, then how much.
         </p>
@@ -115,15 +116,13 @@ export function AddWorkoutForm({ today }: { today: string }) {
                 type="button"
                 aria-pressed={on}
                 onClick={() => chooseActivity(a.activity, a.unit)}
-                className={`grid justify-items-center gap-1 rounded-2xl border px-1 py-2.5 text-xs font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 active:scale-95 ${
+                className={`grid justify-items-center gap-1 rounded-2xl border px-1 py-2.5 text-xs font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600 active:scale-95 ${
                   on
-                    ? "border-emerald-500 bg-emerald-50 text-emerald-900 shadow-md ring-2 shadow-emerald-600/20 ring-emerald-500 dark:bg-emerald-950 dark:text-emerald-100"
-                    : "border-slate-200 bg-white/80 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/60 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-200 dark:hover:bg-slate-800"
+                    ? "border-orange-500 bg-orange-50 text-orange-900 shadow-md ring-2 shadow-orange-600/20 ring-orange-500 dark:bg-orange-950 dark:text-orange-100"
+                    : "border-slate-200 bg-white/80 text-slate-700 hover:border-orange-300 hover:bg-orange-50/60 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-200 dark:hover:bg-slate-800"
                 }`}
               >
-                <span className="text-2xl" aria-hidden="true">
-                  {activityEmoji(a.activity)}
-                </span>
+                <ActivityIcon activity={a.activity} className="size-6" />
                 <span className="w-full truncate text-center">{a.label}</span>
               </button>
             );
@@ -160,11 +159,18 @@ export function AddWorkoutForm({ today }: { today: string }) {
               }}
               className={`rounded-full py-1.5 text-sm font-semibold transition ${
                 unit === u
-                  ? "bg-white text-emerald-700 shadow dark:bg-slate-700 dark:text-emerald-300"
+                  ? "bg-white text-orange-700 shadow dark:bg-slate-700 dark:text-orange-300"
                   : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
               }`}
             >
-              {u === "min" ? "⏱️ Minutes" : "🔁 Reps"}
+              <span className="inline-flex items-center justify-center gap-1.5">
+                {u === "min" ? (
+                  <Timer aria-hidden="true" className="size-4" />
+                ) : (
+                  <Repeat aria-hidden="true" className="size-4" />
+                )}
+                {u === "min" ? "Minutes" : "Reps"}
+              </span>
             </button>
           ))}
         </div>
@@ -188,7 +194,7 @@ export function AddWorkoutForm({ today }: { today: string }) {
             onClick={() => bump(-1)}
             className="grid size-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-xl font-bold text-slate-700 transition hover:bg-slate-200 active:scale-95 dark:bg-slate-800 dark:text-slate-200"
           >
-            −
+            <Minus aria-hidden="true" className="size-5" strokeWidth={3} />
           </button>
           <input
             type="number"
@@ -208,7 +214,7 @@ export function AddWorkoutForm({ today }: { today: string }) {
             onClick={() => bump(1)}
             className="grid size-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-xl font-bold text-slate-700 transition hover:bg-slate-200 active:scale-95 dark:bg-slate-800 dark:text-slate-200"
           >
-            +
+            <Plus aria-hidden="true" className="size-5" strokeWidth={3} />
           </button>
         </div>
       </Step>
@@ -251,7 +257,7 @@ export function AddWorkoutForm({ today }: { today: string }) {
       <button
         type="submit"
         disabled={pending || !ready}
-        className="rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 px-4 py-4 text-base font-extrabold text-white shadow-lg shadow-emerald-600/30 transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 active:scale-[0.98] disabled:opacity-50 disabled:shadow-none"
+        className="rounded-2xl bg-gradient-to-r from-orange-500 via-rose-500 to-fuchsia-500 px-4 py-4 text-base font-bold text-white shadow-lg shadow-orange-600/30 transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600 active:scale-[0.98] disabled:opacity-50 disabled:shadow-none"
       >
         {pending
           ? "Saving…"
@@ -264,7 +270,9 @@ export function AddWorkoutForm({ today }: { today: string }) {
         {state.error ? (
           <span className="text-rose-700 dark:text-rose-400">{state.error}</span>
         ) : state.ok ? (
-          <span className="text-emerald-700 dark:text-emerald-400">🎉 Logged. Nice work!</span>
+          <span className="inline-flex items-center gap-1.5 text-orange-700 dark:text-orange-400">
+            <PartyPopper aria-hidden="true" className="size-4" /> Logged. Nice work!
+          </span>
         ) : null}
       </p>
     </form>

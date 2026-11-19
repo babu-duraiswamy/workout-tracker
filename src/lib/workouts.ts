@@ -99,22 +99,37 @@ export function weeklyMinutesByUser(rows: WorkoutRow[], today: string): Map<stri
   return totals;
 }
 
-/** A friendly emoji for an activity name, matched by keyword. Falls back to a generic one. */
-export function activityEmoji(activity: string): string {
+export type ActivityKind =
+  | "walk"
+  | "run"
+  | "legs"
+  | "band"
+  | "mind"
+  | "stretch"
+  | "cycle"
+  | "swim"
+  | "lift"
+  | "dance"
+  | "core"
+  | "climb"
+  | "other";
+
+/** What sort of activity this is, matched by keyword. The UI maps each kind to an icon. */
+export function activityKind(activity: string): ActivityKind {
   const a = activity.toLowerCase();
-  if (/walk|steps|hike/.test(a)) return "🚶";
-  if (/run|jog/.test(a)) return "🏃";
-  if (/squat|lunge|leg/.test(a)) return "🦵";
-  if (/knee|band/.test(a)) return "🎗️";
-  if (/breath|meditat|yoga/.test(a)) return "🧘";
-  if (/stretch/.test(a)) return "🤸";
-  if (/cycl|bike/.test(a)) return "🚴";
-  if (/swim/.test(a)) return "🏊";
-  if (/weight|lift|gym|push|pull|strength/.test(a)) return "🏋️";
-  if (/dance|zumba/.test(a)) return "💃";
-  if (/plank|core|abs|sit-?up/.test(a)) return "🎯";
-  if (/stair|climb/.test(a)) return "🧗";
-  return "💪";
+  if (/walk|steps|hike/.test(a)) return "walk";
+  if (/run|jog/.test(a)) return "run";
+  if (/squat|lunge|leg/.test(a)) return "legs";
+  if (/knee|band/.test(a)) return "band";
+  if (/breath|meditat|yoga/.test(a)) return "mind";
+  if (/stretch/.test(a)) return "stretch";
+  if (/cycl|bike/.test(a)) return "cycle";
+  if (/swim/.test(a)) return "swim";
+  if (/weight|lift|gym|push|pull|strength/.test(a)) return "lift";
+  if (/dance|zumba/.test(a)) return "dance";
+  if (/plank|core|abs|sit-?up/.test(a)) return "core";
+  if (/stair|climb/.test(a)) return "climb";
+  return "other";
 }
 
 export type DayTotal = { date: string; minutes: number };

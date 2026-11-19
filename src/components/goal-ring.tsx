@@ -1,3 +1,4 @@
+import { Trophy } from "lucide-react";
 import { goalPercent, WEEKLY_GOAL_MIN } from "@/lib/workouts";
 
 /** Circular progress toward the weekly minutes goal. Pure SVG, no client JS. */
@@ -32,9 +33,9 @@ export function GoalRing({ minutes }: { minutes: number }) {
       </svg>
       <div className="absolute inset-0 grid place-items-center text-center leading-none">
         {done ? (
-          <span className="text-3xl">🏆</span>
+          <Trophy aria-hidden="true" className="size-9" strokeWidth={2} />
         ) : (
-          <span className="text-xl font-extrabold tabular-nums">
+          <span className="text-xl font-bold tabular-nums">
             {pct}
             <span className="text-xs font-semibold">%</span>
           </span>

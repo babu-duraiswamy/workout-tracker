@@ -1,18 +1,18 @@
-/** Two fixed tones: the signed-in viewer is always emerald, the other person violet. */
+/** Two fixed tones: the signed-in viewer is always orange, the other person indigo. */
 export const TONES = {
   you: {
-    avatar: "bg-gradient-to-br from-emerald-400 to-teal-600 text-white",
-    card: "from-emerald-500 to-teal-600",
-    text: "text-emerald-700 dark:text-emerald-300",
-    bar: "bg-emerald-500",
-    chip: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
+    avatar: "bg-gradient-to-br from-orange-400 to-rose-600 text-white",
+    card: "from-orange-500 to-rose-600",
+    text: "text-orange-700 dark:text-orange-300",
+    bar: "bg-orange-500",
+    chip: "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-200",
   },
   other: {
-    avatar: "bg-gradient-to-br from-fuchsia-400 to-violet-600 text-white",
-    card: "from-fuchsia-500 to-violet-600",
-    text: "text-violet-700 dark:text-violet-300",
-    bar: "bg-violet-500",
-    chip: "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200",
+    avatar: "bg-gradient-to-br from-sky-400 to-indigo-600 text-white",
+    card: "from-sky-500 to-indigo-600",
+    text: "text-indigo-700 dark:text-indigo-300",
+    bar: "bg-indigo-500",
+    chip: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200",
   },
 } as const;
 

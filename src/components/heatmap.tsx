@@ -2,10 +2,10 @@ import { formatUK, type HeatCell } from "@/lib/workouts";
 
 const LEVEL = [
   "bg-slate-200/70 dark:bg-slate-800",
-  "bg-emerald-200 dark:bg-emerald-900",
-  "bg-emerald-300 dark:bg-emerald-700",
-  "bg-emerald-500 dark:bg-emerald-500",
-  "bg-emerald-700 dark:bg-emerald-300",
+  "bg-orange-200 dark:bg-orange-900",
+  "bg-orange-300 dark:bg-orange-700",
+  "bg-orange-500 dark:bg-orange-500",
+  "bg-orange-700 dark:bg-orange-300",
 ] as const;
 
 const DAY_LABELS = ["M", "", "W", "", "F", "", ""];

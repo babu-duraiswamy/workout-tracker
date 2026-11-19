@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ACTIVITIES,
   AMOUNT_PRESETS,
-  activityEmoji,
+  activityKind,
   activityBreakdown,
   currentStreak,
   formatUK,
@@ -118,11 +118,11 @@ describe("currentStreak", () => {
   });
 });
 
-describe("activityEmoji", () => {
+describe("activityKind", () => {
   it("matches keywords and falls back", () => {
-    expect(activityEmoji("Walking")).toBe("🚶");
-    expect(activityEmoji("Resistance band (knee)")).toBe("🎗️");
-    expect(activityEmoji("Basketball")).toBe("💪");
+    expect(activityKind("Walking")).toBe("walk");
+    expect(activityKind("Resistance band (knee)")).toBe("band");
+    expect(activityKind("Basketball")).toBe("other");
   });
 });
 

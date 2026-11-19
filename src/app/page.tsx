@@ -1,11 +1,26 @@
 import { count, desc, eq, gte } from "drizzle-orm";
+import {
+  Flame,
+  Flag,
+  Hand,
+  HeartHandshake,
+  LogOut,
+  Moon,
+  Sprout,
+  Sun,
+  Sunrise,
+  Trash2,
+  Zap,
+} from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { clearMyWorkouts, deleteSelected } from "@/app/actions";
 import { auth, signOut } from "@/auth";
 import { ConfirmSubmit, SelectAllButton } from "@/components/bulk-actions";
+import { ActivityIcon } from "@/components/activity-icon";
 import { ActivityDonut } from "@/components/activity-donut";
 import { AddWorkoutForm } from "@/components/add-workout-form";
+import { APP_NAME, BrandMark } from "@/components/brand";
 import { Avatar, TONES, type Tone } from "@/components/avatar";
 import { DeleteButton } from "@/components/delete-button";
 import { GoalRing } from "@/components/goal-ring";
@@ -15,7 +30,6 @@ import { TrendChart } from "@/components/trend-chart";
 import { db, schema } from "@/db";
 import {
   activityBreakdown,
-  activityEmoji,
   currentStreak,
   formatUK,
   heatmapWeeks,
@@ -40,7 +54,7 @@ const HISTORY_DAYS = 730;
 const ROW_LIMIT = 5000;
 
 const CARD =
-  "rounded-3xl border border-white/60 bg-white/70 p-4 shadow-lg shadow-emerald-900/5 backdrop-blur dark:border-white/10 dark:bg-slate-900/60";
+  "rounded-3xl border border-white/60 bg-white/70 p-4 shadow-lg shadow-orange-900/5 backdrop-blur dark:border-white/10 dark:bg-slate-900/60";
 
 const FILTERS = [
   { key: "all", label: "Everyone" },
@@ -156,7 +170,7 @@ export default async function Home({
 
   return (
     <main className="mx-auto grid max-w-6xl gap-6 px-4 pt-4 pb-12 lg:px-8 lg:pt-8">
-      <header className="animate-rise relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-emerald-500 via-teal-500 to-fuchsia-500 p-5 text-white shadow-xl shadow-emerald-600/25">
+      <header className="animate-rise relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-orange-500 via-rose-500 to-indigo-600 p-5 text-white shadow-xl shadow-orange-600/25">
         <div
           aria-hidden="true"
           className="absolute -top-10 -right-8 size-40 rounded-full bg-white/15"
@@ -167,10 +181,15 @@ export default async function Home({
         />
         <div className="relative flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-white/85">{greeting()}</p>
-            <h1 className="truncate text-3xl font-extrabold tracking-tight">
-              {myName.split(" ")[0]}
-            </h1>
+            <div className="mb-3 flex items-center gap-2">
+              <BrandMark className="size-8 rounded-xl bg-white/20 from-white/25 via-white/25 to-white/25 shadow-none" />
+              <span className="text-lg font-black tracking-tight">{APP_NAME}</span>
+            </div>
+            <p className="flex items-center gap-1.5 text-sm font-medium text-white/85">
+              <GreetingIcon />
+              {greeting()}
+            </p>
+            <h1 className="truncate text-3xl font-bold tracking-tight">{myName.split(" ")[0]}</h1>
             <p className="mt-0.5 text-xs text-white/80">{formatUK(today)}</p>
           </div>
           <form
@@ -181,32 +200,39 @@ export default async function Home({
           >
             <button
               type="submit"
-              className="rounded-full bg-white/20 px-3 py-1.5 text-sm font-medium backdrop-blur transition hover:bg-white/30"
+              className="flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1.5 text-sm font-medium backdrop-blur transition hover:bg-white/30"
             >
+              <LogOut aria-hidden="true" className="size-4" />
               Sign out
             </button>
           </form>
         </div>
         <div className="relative mt-5 flex flex-wrap gap-2 text-sm font-bold">
           <span
-            className="rounded-full bg-white/95 px-3.5 py-1.5 text-orange-600 shadow-sm"
+            className="flex items-center gap-1.5 rounded-full bg-white/95 px-3.5 py-1.5 text-orange-600 shadow-sm"
             title="Days in a row you've logged something"
           >
-            🔥 {streak} {streak === 1 ? "day" : "days"} streak
+            <Flame aria-hidden="true" className="size-4 fill-orange-500" />
+            {streak} {streak === 1 ? "day" : "days"} streak
           </span>
-          <span className="rounded-full bg-white/20 px-3.5 py-1.5 backdrop-blur">
-            ⚡ {weekTotal} min this week
+          <span className="flex items-center gap-1.5 rounded-full bg-white/20 px-3.5 py-1.5 backdrop-blur">
+            <Zap aria-hidden="true" className="size-4 fill-white" />
+            {weekTotal} min this week
           </span>
         </div>
       </header>
 
       {theirName && (
         <p
-          className="animate-rise flex items-center gap-3 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900 dark:border-violet-900 dark:bg-violet-950/60 dark:text-violet-100"
+          className="animate-rise flex items-center gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900 dark:border-indigo-900 dark:bg-indigo-950/60 dark:text-indigo-100"
           style={{ animationDelay: "60ms" }}
         >
-          <span className="text-2xl" aria-hidden="true">
-            {myToday.length === 0 ? "👋" : "🙌"}
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-200">
+            {myToday.length === 0 ? (
+              <Hand aria-hidden="true" className="size-5" />
+            ) : (
+              <HeartHandshake aria-hidden="true" className="size-5" />
+            )}
           </span>
           <span>
             <strong>{theirName}</strong> has logged {theirToday.length}{" "}
@@ -244,11 +270,11 @@ export default async function Home({
                         <Avatar name={nameOf(userId)} tone={toneOf(userId)} size="sm" />
                         <span className="truncate text-sm font-semibold">{nameOf(userId)}</span>
                       </div>
-                      <div className="mt-1 text-3xl font-extrabold tabular-nums">
+                      <div className="mt-1 text-3xl font-bold tabular-nums">
                         {mins} <span className="text-sm font-medium text-white/80">min</span>
                       </div>
                       <div className="text-xs text-white/85">
-                        {left === 0 ? "Goal reached! 🎉" : `${left} min to go`}
+                        {left === 0 ? "Goal reached!" : `${left} min to go`}
                       </div>
                     </div>
                   </div>
@@ -278,7 +304,7 @@ export default async function Home({
                     aria-current={range === r.key ? "page" : undefined}
                     className={`rounded-full px-2.5 py-1 font-medium whitespace-nowrap transition sm:px-3 ${
                       range === r.key
-                        ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow"
+                        ? "bg-gradient-to-r from-orange-500 to-rose-500 text-white shadow"
                         : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
                     }`}
                   >
@@ -297,7 +323,7 @@ export default async function Home({
             <div className={CARD}>
               {summary.minutes === 0 ? (
                 <p className="py-6 text-center text-sm text-slate-600 dark:text-slate-400">
-                  <span className="mb-2 block text-3xl">🌱</span>
+                  <Sprout aria-hidden="true" className="mx-auto mb-2 size-9 text-orange-500" />
                   No minutes logged in this period yet.
                 </p>
               ) : (
@@ -365,8 +391,11 @@ export default async function Home({
                     key={t.activity}
                     className="rounded-full bg-white/80 px-3 py-1 text-sm font-medium shadow-sm dark:bg-slate-900/70"
                   >
-                    {activityEmoji(t.activity)} {t.activity}{" "}
-                    <span className="text-slate-500">×{t.count}</span>
+                    <ActivityIcon
+                      activity={t.activity}
+                      className="mr-1 inline size-4 align-[-3px] text-orange-600"
+                    />
+                    {t.activity} <span className="text-slate-500">×{t.count}</span>
                   </span>
                 ))}
               </div>
@@ -397,7 +426,7 @@ export default async function Home({
                       aria-current={filter === f.key ? "page" : undefined}
                       className={`rounded-full px-3 py-1 font-medium transition ${
                         filter === f.key
-                          ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow"
+                          ? "bg-gradient-to-r from-orange-500 to-rose-500 text-white shadow"
                           : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
                       }`}
                     >
@@ -413,7 +442,7 @@ export default async function Home({
                     htmlFor="select-mode"
                     className="flex w-fit items-center gap-2 rounded-full bg-white/70 px-3.5 py-1.5 text-sm font-semibold text-slate-700 shadow-sm transition group-has-[#select-mode:checked]/log:bg-rose-600 group-has-[#select-mode:checked]/log:text-white group-has-[#select-mode:focus-visible]/log:outline-2 group-has-[#select-mode:focus-visible]/log:outline-offset-2 group-has-[#select-mode:focus-visible]/log:outline-rose-500 hover:bg-white dark:bg-slate-900/70 dark:text-slate-200"
                   >
-                    <span aria-hidden="true">🗑️</span>
+                    <Trash2 aria-hidden="true" className="size-4" />
                     <span className="group-has-[#select-mode:checked]/log:hidden">
                       Select entries to remove
                     </span>
@@ -449,7 +478,7 @@ export default async function Home({
                 <p
                   className={`${CARD} border-dashed text-center text-sm text-slate-600 dark:text-slate-400`}
                 >
-                  <span className="mb-2 block text-3xl">🏁</span>
+                  <Flag aria-hidden="true" className="mx-auto mb-2 size-9 text-indigo-500" />
                   {rows.length === 0
                     ? "No workouts logged yet. Pick an activity and an amount above, then tap Log."
                     : "Nothing here for this period and filter."}
@@ -487,13 +516,13 @@ export default async function Home({
                               return (
                                 <li
                                   key={r.id}
-                                  className={`animate-rise flex items-center gap-3 rounded-2xl border border-l-4 border-white/60 bg-white/80 px-3 py-3 shadow-sm dark:border-white/10 dark:bg-slate-900/70 ${tone === "you" ? "border-l-emerald-500" : "border-l-violet-500"}`}
+                                  className={`animate-rise flex items-center gap-3 rounded-2xl border border-l-4 border-white/60 bg-white/80 px-3 py-3 shadow-sm dark:border-white/10 dark:bg-slate-900/70 ${tone === "you" ? "border-l-orange-500" : "border-l-indigo-500"}`}
                                 >
                                   <span
                                     aria-hidden="true"
-                                    className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-amber-100 to-rose-100 text-2xl dark:from-slate-800 dark:to-slate-700"
+                                    className={`grid size-11 shrink-0 place-items-center rounded-2xl ${TONES[tone].chip}`}
                                   >
-                                    {activityEmoji(r.activity)}
+                                    <ActivityIcon activity={r.activity} className="size-6" />
                                   </span>
                                   <div className="min-w-0 flex-1">
                                     <div className="truncate font-semibold">{r.activity}</div>
@@ -552,9 +581,21 @@ function greeting(now: Date = new Date()): string {
       timeZone: "Asia/Kolkata",
     }).format(now),
   );
-  if (hour < 12) return "Good morning ☀️";
-  if (hour < 17) return "Good afternoon 🌤️";
-  return "Good evening 🌙";
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
+function GreetingIcon({ now = new Date() }: { now?: Date }) {
+  const hour = Number(
+    new Intl.DateTimeFormat("en-GB", {
+      hour: "numeric",
+      hour12: false,
+      timeZone: "Asia/Kolkata",
+    }).format(now),
+  );
+  const Icon = hour < 12 ? Sunrise : hour < 17 ? Sun : Moon;
+  return <Icon aria-hidden="true" className="size-4" />;
 }
 
 function monthLabel(key: string): string {

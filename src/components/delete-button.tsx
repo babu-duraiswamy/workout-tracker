@@ -1,5 +1,6 @@
 "use client";
 
+import { Trash2 } from "lucide-react";
 import { deleteWorkout } from "@/app/actions";
 
 /**
@@ -26,16 +27,7 @@ export function DeleteButton({
       title="Remove"
       className={`grid size-9 place-items-center rounded-full text-slate-400 transition hover:bg-rose-100 hover:text-rose-600 focus-visible:outline-2 focus-visible:outline-rose-500 dark:hover:bg-rose-950 ${className}`}
     >
-      <svg
-        viewBox="0 0 24 24"
-        className="size-5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      >
-        <path d="M18 6 6 18M6 6l12 12" />
-      </svg>
+      <Trash2 aria-hidden="true" className="size-5" />
     </button>
   );
 }

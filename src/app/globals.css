@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+@theme inline {
+  --font-sans: var(--font-roboto), ui-sans-serif, system-ui, sans-serif;
+}
+
 /* Tailwind v4 resets buttons to the default arrow. Anything clickable should show the hand. */
 @layer base {
   button:not(:disabled),

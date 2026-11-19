@@ -1,7 +1,9 @@
-import { activityEmoji, type Slice } from "@/lib/workouts";
+import { Layers } from "lucide-react";
+import { ActivityIcon } from "@/components/activity-icon";
+import type { Slice } from "@/lib/workouts";
 
 // Distinct, colour-blind-friendly-ish hues. "Other" is always the neutral last one.
-const COLORS = ["#10b981", "#0ea5e9", "#f59e0b", "#d946ef", "#f43f5e", "#8b5cf6"];
+const COLORS = ["#f97316", "#6366f1", "#f43f5e", "#0ea5e9", "#eab308", "#a855f7"];
 const OTHER = "#94a3b8";
 
 function colorFor(slice: Slice, i: number): string {
@@ -28,7 +30,7 @@ export function ActivityDonut({ slices }: { slices: Slice[] }) {
       >
         <div className="grid size-20 place-items-center rounded-full bg-white text-center leading-tight shadow-inner dark:bg-slate-900">
           <div>
-            <div className="text-xl font-extrabold tabular-nums">{total}</div>
+            <div className="text-xl font-bold tabular-nums">{total}</div>
             <div className="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
               min
             </div>
@@ -44,7 +46,12 @@ export function ActivityDonut({ slices }: { slices: Slice[] }) {
               aria-hidden="true"
             />
             <span className="min-w-0 flex-1 truncate">
-              {s.activity === "Other" ? "🧩" : activityEmoji(s.activity)} {s.activity}
+              {s.activity === "Other" ? (
+                <Layers aria-hidden="true" className="mr-1.5 inline size-4 align-[-3px]" />
+              ) : (
+                <ActivityIcon activity={s.activity} className="mr-1.5 inline size-4 align-[-3px]" />
+              )}
+              {s.activity}
             </span>
             <span className="font-semibold tabular-nums">{s.minutes}</span>
             <span className="w-9 text-right text-xs text-slate-500 tabular-nums">{s.pct}%</span>
